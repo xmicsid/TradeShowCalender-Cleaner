@@ -1,6 +1,5 @@
 # app.py
 from datetime import datetime
-import pandas as pd
 import streamlit as st
 from clean_tradeshow import parse_many
 
@@ -26,8 +25,8 @@ uploads = st.file_uploader(
 
 if uploads:
     contents = [u.read() for u in uploads]
-    df = parse_many(contents)
-    df.reset_index(drop=True, inplace=True)  # remove the index column from display
+    df = parse_many(contents).copy()
+    df.reset_index(drop=True, inplace=True)
 
     if df.empty:
         st.warning("No rows parsed. Double-check the page was saved as **HTML only**.")
@@ -36,18 +35,20 @@ if uploads:
     st.success(f"Parsed {len(df):,} rows from {len(uploads)} file(s).")
     st.dataframe(df.head(100), use_container_width=True, hide_index=True)
 
-    # Default to full set; apply optional filter inside the expander
-    show = df.copy()
-
+    # Optional quick filter
     with st.expander("Quick filter (optional)"):
-        min_exh = st.number_input("Minimum Exhibitors", value=0, min_value=0, step=50)
-        min_att = st.number_input("Minimum Attendees", value=0, min_value=0, step=100)
+        col1, col2 = st.columns(2)
+        with col1:
+            min_exh = st.number_input("Minimum Exhibitors", value=0, min_value=0, step=50)
+        with col2:
+            min_att = st.number_input("Minimum Attendees", value=0, min_value=0, step=100)
+
         show = df[(df["Exhibitors"].fillna(0) >= min_exh) & (df["Attendees"].fillna(0) >= min_att)].copy()
         show.reset_index(drop=True, inplace=True)
         st.write(f"{len(show):,} rows after filter")
         st.dataframe(show.head(200), use_container_width=True, hide_index=True)
 
-    # Download
+    # Download CSV (MVP, bulletproof)
     csv_bytes = show.to_csv(index=False).encode("utf-8")
     fname = f"upcoming_hv_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     st.download_button("Download CSV", data=csv_bytes, file_name=fname, mime="text/csv")
